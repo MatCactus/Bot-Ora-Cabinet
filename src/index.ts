@@ -9,9 +9,14 @@ export const client = new Discord.Client({
     intents: [
         "GUILDS",
         "DIRECT_MESSAGES",
+        "DIRECT_MESSAGE_REACTIONS",
+        "DIRECT_MESSAGE_TYPING",
         "GUILD_MESSAGES",
         "GUILD_MESSAGE_REACTIONS",
         "DIRECT_MESSAGE_REACTIONS",
+    ],
+    partials: [
+        "CHANNEL", // Required to receive DMs
     ],
 });
 
@@ -20,14 +25,17 @@ client.once("ready", async () => {
     client.user?.setPresence({
         activities: [
             {
-                name: "l'équipe s'occuper de moi",
+                name: "Des questions ? Je suis là !",
                 type: "WATCHING",
             },
         ],
     });
 
     const modules = await fs.promises.readdir(`${__dirname}/modules`);
-    modules.forEach(e => require(`${__dirname}/modules/${e}`));
+    modules.forEach(e => {
+        require(`${__dirname}/modules/${e}`);
+        console.log(`Module ${e} Loaded.`);
+    });
     console.log("I'm ready to be Abused");
 });
 
