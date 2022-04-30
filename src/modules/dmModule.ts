@@ -1,4 +1,10 @@
-import { MessageActionRow, MessageButton, MessageEmbed } from "discord.js";
+import {
+    DMChannel,
+    MessageActionRow,
+    MessageAttachment,
+    MessageButton,
+    MessageEmbed,
+} from "discord.js";
 import { client } from "../index";
 import { data } from "../utils/dbFileManager";
 
@@ -80,9 +86,22 @@ client.on("messageCreate", async message => {
     const linkedChannel = client.channels.resolve(
         data.dm.find(e => e.clientId === message.author.id)?.channelId ?? ""
     );
+    const messageAttachments: any[] = [];
+    message.attachments.forEach(e => {
+        messageAttachments.push(
+            new MessageAttachment(e.url, e.name ?? undefined, {
+                url: e.url,
+                filename: e.name ?? "",
+                id: e.id,
+                proxy_url: e.proxyURL,
+                size: e.size,
+            })
+        );
+    });
     if (linkedChannel?.type === "GUILD_TEXT")
         await linkedChannel.send({
             content: `**${message.author.username}:** ${message.content}`,
+            files: messageAttachments,
         });
     else message.reply(errorMessage);
 });
@@ -94,21 +113,124 @@ client.on("messageCreate", async message => {
         !data.dm.some(e => e.channelId === message.channel.id)
     )
         return;
-    if (!message.content.startsWith("."))
+    if (!message.content.startsWith(".")) {
+        const messageAttachments: any[] = [];
+        message.attachments.forEach(e => {
+            messageAttachments.push(
+                new MessageAttachment(e.url, e.name ?? undefined, {
+                    url: e.url,
+                    filename: e.name ?? "",
+                    id: e.id,
+                    proxy_url: e.proxyURL,
+                    size: e.size,
+                })
+            );
+        });
         await client.users
             .resolve(
                 data.dm.find(e => e.channelId === message.channel.id)
                     ?.clientId ?? ""
             )
-            ?.send(
-                `**(${message.member?.roles.highest.name}) ${message.member?.displayName}:**\n${message.content}`
-            )
+            ?.send({
+                content: `**(${message.member?.roles.highest.name}) ${message.member?.displayName}:**\n${message.content}`,
+                files: messageAttachments,
+            })
             .catch(e =>
                 message.reply(
                     "An error occurred when transcripting this message.."
                 )
             );
-    else {
+    } else {
         console.log("command");
     }
+});
+
+client.on("channelDelete", async channel => {
+    if (!data.dm.some(e => e.channelId === channel.id)) return;
+
+    await client.users
+        .resolve(data.dm.find(e => e.channelId === channel.id)?.clientId ?? "")
+        ?.send({
+            embeds: [
+                new MessageEmbed()
+                    .setDescription(
+                        `**Bonjour à vous**,\nNous vous confirmons que le __lien__établi entre l'__actuel salon de conversation__ et celui dans lequel les __intervenants du cabinet__ interagissait avec vous vient d'être __clôturé__.\n*Ceci est un message automatique destiné à ${await client.users.resolve(
+                            data.dm.find(e => e.channelId === channel.id)
+                                ?.clientId ?? ""
+                        )} suite à une interaction avec notre service. Si vous n'êtes pas le destinataire esconté, merci de supprimer cette conversation et de nous en aventir au plus vite.*\n\n*Message Automatique,*\n*Secrétariat Cabinet Hermerion,*\n*Hermerion Law Firm GP*:H2:`
+                    )
+                    .setColor("DARK_BUT_NOT_BLACK")
+                    .setThumbnail(
+                        "https://cdn.discordapp.com/attachments/922993915966160896/922994083381772319/Hermerion_petit_blanc.png"
+                    )
+                    .setTimestamp(),
+            ],
+        })
+        .catch(e =>
+            console.log(
+                `An error occurred when closing this ticket .. (Channel ID: ${channel.id})`
+            )
+        );
+
+    const linkedChannel = client.channels.resolve("888762420099698698");
+    if (linkedChannel?.type === "GUILD_TEXT" && channel.type === "GUILD_TEXT")
+        await linkedChannel.send({
+            embeds: [
+                new MessageEmbed()
+                    .setDescription(
+                        `Suppresion du Channel de discussion « ${
+                            channel.name
+                        } » en lien avec ${await client.users.resolve(
+                            data.dm.find(e => e.channelId === channel.id)
+                                ?.clientId ?? ""
+                        )}.`
+                    )
+                    .setColor("DARK_BUT_NOT_BLACK")
+                    .setThumbnail(
+                        "https://cdn.discordapp.com/attachments/922993915966160896/922994083381772319/Hermerion_petit_blanc.png"
+                    )
+                    .setTimestamp(),
+            ],
+        });
+
+    // edit message component by locking the close button
+
+    const dmClientChannel = client.users.resolve(
+        data.dm.find(e => e.channelId === channel.id)?.clientId ?? ""
+    )?.dmChannel;
+    if (dmClientChannel?.type === "DM") {
+        dmClientChannel.messages
+            .resolve(
+                data.dm.find(e => e.channelId === channel.id)?.messageId ?? ""
+            )
+            ?.edit({
+                components: [
+                    new MessageActionRow().addComponents(
+                        new MessageButton()
+                            .setCustomId(`dm_stop_disabled`)
+                            .setEmoji("<:H2:923011948088553512>")
+                            .setLabel("Clore cette transcription")
+                            .setStyle("DANGER")
+                            .setDisabled(true)
+                    ),
+                ],
+            });
+    }
+
+    data.dm.splice(data.dm.findIndex(f => f.channelId === channel.id));
+});
+
+client.on("interactionCreate", async interaction => {
+    if (!interaction.isButton() || !interaction.customId.startsWith("dm_stop_"))
+        return;
+
+    const [dm, stop, clientId, channelId] = interaction.customId.split("_");
+
+    await interaction.reply({
+        content:
+            "Votre requête a bien été prise en compte et est en cours de traitement.",
+        ephemeral: true,
+    });
+    const channel = client.channels.resolve(channelId);
+    if (channel) channel.delete();
 });
