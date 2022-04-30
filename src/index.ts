@@ -14,6 +14,7 @@ export const client = new Discord.Client({
         "GUILD_MESSAGES",
         "GUILD_MESSAGE_REACTIONS",
         "DIRECT_MESSAGE_REACTIONS",
+        "GUILDS",
     ],
     partials: [
         "CHANNEL", // Required to receive DMs
