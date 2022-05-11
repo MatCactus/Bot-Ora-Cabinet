@@ -1,5 +1,4 @@
 import {
-    DMChannel,
     MessageActionRow,
     MessageAttachment,
     MessageButton,
